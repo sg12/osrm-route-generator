@@ -21,8 +21,11 @@ FROM node:18-alpine AS runtime
 COPY --from=builder /usr/local/bin/osrm-routed /usr/bin/osrm-routed
 COPY --from=builder /data /data
 
-# Копируем Boost libs и другие deps для совместимости (фикс missing libboost*)
+# Копируем Boost libs и compression deps для совместимости (фикс libboost_iostreams)
 COPY --from=builder /usr/lib/libboost* /usr/lib/
+COPY --from=builder /usr/lib/libbz2* /usr/lib/
+COPY --from=builder /usr/lib/liblzma* /usr/lib/
+COPY --from=builder /usr/lib/libzstd* /usr/lib/
 
 # Скопируйте скрипт батч-генерации
 COPY generate-routes.js /app/generate-routes.js
