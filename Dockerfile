@@ -29,6 +29,9 @@ COPY --from=builder /data.tar.gz /tmp/data.tar.gz
 # Извлекаем /data из tar (гарантирует все .osrm-файлы)
 RUN tar xzf /tmp/data.tar.gz -C / && rm /tmp/data.tar.gz
 
+# Дебаж: Проверим, что .osrm-файлы на месте (удалите после успеха)
+RUN ls -la /data/*.osrm*
+
 # Копируем Boost libs и compression deps для совместимости (фикс libboost_iostreams)
 COPY --from=builder /usr/lib/libboost* /usr/lib/
 COPY --from=builder /usr/lib/libbz2* /usr/lib/
