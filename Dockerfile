@@ -23,7 +23,6 @@ COPY --from=builder /data /data
 
 # Копируем Boost libs и другие deps для совместимости (фикс missing libboost*)
 COPY --from=builder /usr/lib/libboost* /usr/lib/
-COPY --from=builder /lib /lib  # Базовые libs (zlib, etc., если нужно)
 
 # Скопируйте скрипт батч-генерации
 COPY generate-routes.js /app/generate-routes.js
