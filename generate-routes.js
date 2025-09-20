@@ -25,7 +25,9 @@ const routesData = [
   [start, [56.0000, 83.0000]]  // Пример: до Севска
 ];
 
-const OSRM_URL = 'http://localhost:5000/route/v1/driving/';
+const OSRM_URL = 'http://127.0.0.1:5000/route/v1/driving/';
+
+
 const results = [];
 
 async function generateAll() {
@@ -59,7 +61,12 @@ async function generateAll() {
     await new Promise(r => setTimeout(r, 200)); // Пауза 0.2с
   }
   fs.writeFileSync('./routes.json', JSON.stringify(results, null, 2));
-  console.log('Все маршруты сохранены в /data/routes.json');
+
+
+
+  console.log('Все маршруты сохранены в ./routes.json');
+
+
 }
 
 generateAll();
