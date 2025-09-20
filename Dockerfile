@@ -1,8 +1,8 @@
 # Многостадийная сборка: сначала preprocessing, потом runtime
 FROM ghcr.io/project-osrm/osrm-backend:v6.0.0 AS builder
 
-# Установите зависимости для Node.js (для батч-скрипта)
-RUN apt-get update && apt-get install -y nodejs npm wget curl
+# Установите зависимости для Node.js (для батч-скрипта) — используем apk для Alpine
+RUN apk update && apk add --no-cache nodejs npm wget curl
 
 # Скачайте OSM-данные для России (обновите URL при необходимости)
 WORKDIR /data
@@ -25,7 +25,7 @@ COPY --from=builder /data /data
 COPY generate-routes.js /app/generate-routes.js
 WORKDIR /app
 
-# Установите axios для скрипта
+# Установите axios для скрипта (npm в node:18-slim работает с apt, но здесь только npm)
 RUN npm install -g axios
 
 # Запуск: сначала сервер в фоне, потом скрипт, затем вернуть сервер (опционально)
