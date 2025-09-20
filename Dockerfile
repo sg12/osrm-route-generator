@@ -14,8 +14,8 @@ COPY car.lua /opt/car.lua
 # Preprocessing: extract, partition, customize (для MLD-алгоритма) — в одну строку
 RUN osrm-extract -p /opt/car.lua siberian-fed-district-latest.osm.pbf && osrm-partition siberian-fed-district-latest.osrm && osrm-customize siberian-fed-district-latest.osrm
 
-# Runtime stage
-FROM node:18-slim AS runtime
+# Runtime stage (Alpine-based для совместимости libc с OSRM)
+FROM node:18-alpine AS runtime
 
 # Установите OSRM бинарник из builder (явно: только routed для сервера)
 COPY --from=builder /usr/local/bin/osrm-routed /usr/bin/osrm-routed
@@ -31,5 +31,5 @@ RUN npm init -y && npm install axios
 # Добавьте OSRM в PATH
 ENV PATH="/usr/bin:$PATH"
 
-# Запуск: сначала сервер в фоне (полный путь), потом скрипт, затем fg
-CMD ["sh", "-c", "/usr/bin/osrm-routed --algorithm MLD /data/siberian-fed-district-latest.osrm & sleep 10 && node generate-routes.js && fg %1"]
+# Запуск: сервер в фоне, скрипт, затем wait (без fg, чтобы не падать)
+CMD ["sh", "-c", "/usr/bin/osrm-routed --algorithm MLD /data/siberian-fed-district-latest.osrm & sleep 10 && node generate-routes.js && wait"]
