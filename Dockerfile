@@ -17,8 +17,8 @@ RUN osrm-extract -p /opt/car.lua siberian-fed-district-latest.osm.pbf && osrm-pa
 # Runtime stage
 FROM node:18-slim AS runtime
 
-# Установите OSRM бинарники из builder
-COPY --from=builder /opt/osrm-backend /opt/osrm-backend
+# Установите OSRM бинарники из builder (правильный путь: /usr/local/bin/osrm*)
+COPY --from=builder /usr/local/bin/osrm* /usr/local/bin/
 COPY --from=builder /data /data
 
 # Скопируйте скрипт батч-генерации
@@ -27,6 +27,9 @@ WORKDIR /app
 
 # Установите axios для скрипта
 RUN npm install -g axios
+
+# Добавьте OSRM в PATH
+ENV PATH="/usr/local/bin:$PATH"
 
 # Запуск: сначала сервер в фоне, потом скрипт, затем вернуть сервер (опционально)
 CMD ["sh", "-c", "osrm-routed --algorithm MLD /data/siberian-fed-district-latest.osrm & sleep 10 && node generate-routes.js && fg %1"]
