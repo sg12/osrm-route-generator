@@ -14,23 +14,26 @@ COPY car.lua /opt/car.lua
 # Preprocessing: extract, partition, customize (для MLD-алгоритма) — в одну строку
 RUN osrm-extract -p /opt/car.lua siberian-fed-district-latest.osm.pbf && osrm-partition siberian-fed-district-latest.osrm && osrm-customize siberian-fed-district-latest.osrm
 
+# Создайте tar-архив для /data (фикс missing generated files)
+RUN tar czf /data.tar.gz /data
+
 # Runtime stage (Alpine-based для совместимости libc с OSRM)
 FROM node:18-alpine AS runtime
 
 # Установите OSRM бинарник из builder (явно: только routed для сервера)
 COPY --from=builder /usr/local/bin/osrm-routed /usr/bin/osrm-routed
 
-# Копируем всю /data с generated .osrm-файлами (фикс missing files)
-COPY --from=builder /data/. /data/
+# Копируем tar-архив с данными
+COPY --from=builder /data.tar.gz /tmp/data.tar.gz
+
+# Извлекаем /data из tar (гарантирует все .osrm-файлы)
+RUN tar xzf /tmp/data.tar.gz -C / && rm /tmp/data.tar.gz
 
 # Копируем Boost libs и compression deps для совместимости (фикс libboost_iostreams)
 COPY --from=builder /usr/lib/libboost* /usr/lib/
 COPY --from=builder /usr/lib/libbz2* /usr/lib/
 COPY --from=builder /usr/lib/liblzma* /usr/lib/
 COPY --from=builder /usr/lib/libzstd* /usr/lib/
-
-# Верификация файлов (для дебага, удалите после успеха)
-RUN ls -la /data/*.osrm*
 
 # Скопируйте скрипт батч-генерации
 COPY generate-routes.js /app/generate-routes.js
