@@ -17,8 +17,8 @@ RUN osrm-extract -p /opt/car.lua siberian-fed-district-latest.osm.pbf && osrm-pa
 # Runtime stage
 FROM node:18-slim AS runtime
 
-# Установите OSRM бинарники из builder (правильный путь для Alpine: /usr/bin/osrm*)
-COPY --from=builder /usr/bin/osrm* /usr/bin/
+# Установите OSRM бинарник из builder (явно: только routed для сервера)
+COPY --from=builder /usr/local/bin/osrm-routed /usr/bin/osrm-routed
 COPY --from=builder /data /data
 
 # Скопируйте скрипт батч-генерации
@@ -28,7 +28,7 @@ WORKDIR /app
 # Установите axios локально (в /app/node_modules)
 RUN npm init -y && npm install axios
 
-# Добавьте OSRM в PATH (на всякий)
+# Добавьте OSRM в PATH
 ENV PATH="/usr/bin:$PATH"
 
 # Запуск: сначала сервер в фоне (полный путь), потом скрипт, затем fg
