@@ -1,8 +1,7 @@
 const axios = require('axios');
 const fs = require('fs');
 
-// 10 тестовых маршрутов: каждый — [[lat_start, lon_start], [lat_end, lon_end]]
-// Новосибирск: 55.0084, 82.9357
+// 7 тестовых маршрутов (в-регионные)
 const start = [55.0084, 82.9357];
 const routesData = [
   [start, [53.6942, 88.0603]], // Междуреченск
@@ -21,41 +20,44 @@ const results = [];
 async function generateAll() {
   for (let i = 0; i < routesData.length; i++) {
     const [[lat1, lon1], [lat2, lon2]] = routesData[i];
-    const waypoints = `${lon1},${lat1};${lon2},${lat2}`; // OSRM: lon,lat
+    const waypoints = `${lon1},${lat1};${lon2},${lat2}`;
     const url = `${OSRM_URL}${waypoints}?overview=full&geometries=geojson&steps=true`;
 
     try {
       const { data } = await axios.get(url, { timeout: 10000 });
-      console.log(`Ответ для маршрута ${i}: code = ${data.code}`);  // Дебаж: code Ok/NoRoute
-      if (data.routes && data.routes[0] && data.routes[0].geometry && data.routes[0].geometry.coordinates) {
+      console.log(`Ответ для маршрута ${i}: code = ${data.code}, routes.length = ${data.routes ? data.routes.length : 0}`);
+      if (data.routes && data.routes[0]) {
         const route = data.routes[0];
-        results.push({
-          routeId: i,
-          name: `Новосибирск → Город ${i + 1}`,
-          fullGeometry: route.geometry.coordinates, // Полная геометрия [[lon, lat], ...]
-          legs: route.legs.map((leg, legIndex) => ({
-            segment: legIndex,
-            geometry: leg.geometry.coordinates, // Подмаршрут
-            distance: leg.distance,
-            duration: leg.duration
-          })),
-          totalDistance: route.distance, // метров
-          totalDuration: route.duration // секунд
-        });
-        console.log(`Маршрут ${i + 1}/7 готов: ${route.distance / 1000} км`);
+        console.log(`Geometry для маршрута ${i}:`, route.geometry ? 'exists' : 'null');  // Дебаж
+        if (route.geometry && route.geometry.coordinates && route.geometry.coordinates.length > 0) {
+          results.push({
+            routeId: i,
+            name: `Новосибирск → Город ${i + 1}`,
+            fullGeometry: route.geometry.coordinates, // [[lon, lat], ...]
+            legs: route.legs ? route.legs.map((leg, legIndex) => ({
+              segment: legIndex,
+              geometry: leg.geometry ? leg.geometry.coordinates : [],
+              distance: leg.distance,
+              duration: leg.duration
+            })) : [],
+            totalDistance: route.distance,
+            totalDuration: route.duration
+          });
+          console.log(`Маршрут ${i + 1}/7 готов: ${route.distance / 1000} км`);
+        } else {
+          console.log(`Маршрут ${i + 1}/7 без геометрии (coordinates: ${route.geometry ? route.geometry.coordinates ? route.geometry.coordinates.length : 'null' : 'null'})`);
+        }
       } else {
-        console.log(`Маршрут ${i + 1}/7 не найден или без геометрии (code: ${data.code}, routes.length: ${data.routes ? data.routes.length : 0})`);
+        console.log(`Маршрут ${i + 1}/7 не найден (routes: ${data.routes ? data.routes.length : 0})`);
       }
     } catch (error) {
       console.error(`Ошибка для маршрута ${i}:`, error.message);
     }
-    await new Promise(r => setTimeout(r, 200)); // Пауза 0.2с
+    await new Promise(r => setTimeout(r, 200));
   }
 
   fs.writeFileSync('/output/routes.json', JSON.stringify(results, null, 2));
-
   console.log('Все маршруты сохранены в /output/routes.json');
-
 }
 
 generateAll();
