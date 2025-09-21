@@ -5,24 +5,13 @@ const fs = require('fs');
 // Новосибирск: 55.0084, 82.9357
 const start = [55.0084, 82.9357];
 const routesData = [
-  // Новосибирск → Междуреченск: 53.6942, 88.0603
-  [start, [53.6942, 88.0603]],
-  // Новосибирск → Бийск: 52.5364, 85.2072
-  [start, [52.5364, 85.2072]],
-  // Новосибирск → Новокузнецк: 53.7596, 87.1216
-  [start, [53.7596, 87.1216]],
-  // Новосибирск → Томск: 56.4977, 84.9744
-  [start, [56.4977, 84.9744]],
-  // Новосибирск → Павлодар: 52.2740, 77.0044
-  [start, [52.2740, 77.0044]],
-  // Новосибирск → Кемерово: 55.3333, 86.0833
-  [start, [55.3333, 86.0833]],
-  // Новосибирск → Омск: 54.9924, 73.3686
-  [start, [54.9924, 73.3686]],
-  // Добавьте ещё 3 для 10, если нужно (примеры ниже)
-  [start, [55.5000, 80.0000]], // Пример: до Барнаула (55.5, 80.0)
-  [start, [54.0000, 85.0000]], // Пример: до Искитима
-  [start, [56.0000, 83.0000]]  // Пример: до Севска
+  [start, [53.6942, 88.0603]], // Междуреченск
+  [start, [52.5364, 85.2072]], // Бийск
+  [start, [53.7596, 87.1216]], // Новокузнецк
+  [start, [56.4977, 84.9744]], // Томск
+  [start, [55.3333, 86.0833]], // Кемерово
+  [start, [54.9924, 73.3686]], // Омск
+  [start, [53.344, 83.7783]] // Барнаул
 ];
 
 const OSRM_URL = 'http://127.0.0.1:5000/route/v1/driving/';
@@ -38,22 +27,25 @@ async function generateAll() {
 
     try {
       const { data } = await axios.get(url, { timeout: 10000 });
-      if (data.routes && data.routes[0]) {
+      console.log(`Ответ для маршрута ${i}: code = ${data.code}`);  // Дебаж: code Ok/NoRoute
+      if (data.routes && data.routes[0] && data.routes[0].geometry) {
         const route = data.routes[0];
         results.push({
           routeId: i,
-          name: `Новосибирск → Город ${i + 1}`, // Замените на реальные имена
-          fullGeometry: route.geometry.coordinates, // Полная геометрия [[lon, lat], ...]
+          name: `Новосибирск → Город ${i + 1}`,
+          fullGeometry: route.geometry.coordinates,
           legs: route.legs.map((leg, legIndex) => ({
             segment: legIndex,
-            geometry: leg.geometry.coordinates, // Подмаршрут (если >2 waypoints)
+            geometry: leg.geometry.coordinates,
             distance: leg.distance,
             duration: leg.duration
           })),
-          totalDistance: route.distance, // метров
-          totalDuration: route.duration // секунд
+          totalDistance: route.distance,
+          totalDuration: route.duration
         });
         console.log(`Маршрут ${i + 1}/10 готов: ${route.distance / 1000} км`);
+      } else {
+        console.log(`Маршрут ${i + 1}/10 не найден (code: ${data.code})`);
       }
     } catch (error) {
       console.error(`Ошибка для маршрута ${i}:`, error.message);
