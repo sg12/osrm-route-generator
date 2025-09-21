@@ -60,12 +60,10 @@ async function generateAll() {
     }
     await new Promise(r => setTimeout(r, 200)); // Пауза 0.2с
   }
-  fs.writeFileSync('./routes.json', JSON.stringify(results, null, 2));
 
+  fs.writeFileSync('/output/routes.json', JSON.stringify(results, null, 2));
 
-
-  console.log('Все маршруты сохранены в ./routes.json');
-
+  console.log('Все маршруты сохранены в /output/routes.json');
 
 }
 
