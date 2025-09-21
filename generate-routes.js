@@ -16,7 +16,6 @@ const routesData = [
 
 const OSRM_URL = 'http://127.0.0.1:5000/route/v1/driving/';
 
-
 const results = [];
 
 async function generateAll() {
@@ -28,24 +27,24 @@ async function generateAll() {
     try {
       const { data } = await axios.get(url, { timeout: 10000 });
       console.log(`Ответ для маршрута ${i}: code = ${data.code}`);  // Дебаж: code Ok/NoRoute
-      if (data.routes && data.routes[0] && data.routes[0].geometry) {
+      if (data.routes && data.routes[0] && data.routes[0].geometry && data.routes[0].geometry.coordinates) {
         const route = data.routes[0];
         results.push({
           routeId: i,
           name: `Новосибирск → Город ${i + 1}`,
-          fullGeometry: route.geometry.coordinates,
+          fullGeometry: route.geometry.coordinates, // Полная геометрия [[lon, lat], ...]
           legs: route.legs.map((leg, legIndex) => ({
             segment: legIndex,
-            geometry: leg.geometry.coordinates,
+            geometry: leg.geometry.coordinates, // Подмаршрут
             distance: leg.distance,
             duration: leg.duration
           })),
-          totalDistance: route.distance,
-          totalDuration: route.duration
+          totalDistance: route.distance, // метров
+          totalDuration: route.duration // секунд
         });
-        console.log(`Маршрут ${i + 1}/10 готов: ${route.distance / 1000} км`);
+        console.log(`Маршрут ${i + 1}/7 готов: ${route.distance / 1000} км`);
       } else {
-        console.log(`Маршрут ${i + 1}/10 не найден (code: ${data.code})`);
+        console.log(`Маршрут ${i + 1}/7 не найден или без геометрии (code: ${data.code}, routes.length: ${data.routes ? data.routes.length : 0})`);
       }
     } catch (error) {
       console.error(`Ошибка для маршрута ${i}:`, error.message);
