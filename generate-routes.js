@@ -60,4 +60,5 @@ async function generateAll() {
   console.log('Все маршруты сохранены в /output/routes.json');
 }
 
+
 generateAll();
