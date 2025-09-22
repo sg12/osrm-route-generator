@@ -4,7 +4,7 @@ const fs = require('fs');
 // 🎯 ТОЧНЫЕ КООРДИНАТЫ АВТОВОКЗАЛОВ (получены через Yandex Geocoder)
 const terminals = {
   central: [55.035500, 82.898431],       // Россия, Новосибирск, ЖД Вокзал
-  gusinobrodskiy: [55.041566, 83.026464] // тот же адрес — если нужно разделить, уточни адрес центрального
+  gusinobrodskiy: [55.041566, 83.026464] // Гусинобродское Шоссе 37/1 — если нужно разделить, уточни адрес центрального
 };
 
 // 🗺️ МАРШРУТЫ ПО СФО — с точными координатами автовокзалов
@@ -70,7 +70,8 @@ async function generateAll() {
   for (let i = 0; i < routesData.length; i++) {
     const [[lat1, lon1], [lat2, lon2]] = routesData[i].coords;
     const waypoints = `${lon1},${lat1};${lon2},${lat2}`;
-    const url = `${OSRM_URL}${waypoints}?overview=full&geometries=geojson&steps=true`;  // Фикс: &options=strict для хардкода точек
+
+    const url = `${OSRM_URL}${waypoints}?overview=full&geometries=geojson&steps=true&radiuses=200;200`;
 
     try {
       const { data } = await axios.get(url, { timeout: 10000 });
