@@ -70,7 +70,8 @@ async function generateAll() {
   for (let i = 0; i < routesData.length; i++) {
     const [[lat1, lon1], [lat2, lon2]] = routesData[i].coords;
     const waypoints = `${lon1},${lat1};${lon2},${lat2}`;
-    const url = `${OSRM_URL}${waypoints}?overview=full&geometries=geojson&steps=true`;
+    const url = `${OSRM_URL}${waypoints}?overview=full&geometries=geojson&steps=true&radii=100;100`;
+
 
     try {
       const { data } = await axios.get(url, { timeout: 10000 });
