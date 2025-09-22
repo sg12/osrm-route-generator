@@ -4,13 +4,13 @@ const fs = require('fs');
 // 7 тестовых маршрутов (в-регионные)
 const start = [55.0084, 82.9357];
 const routesData = [
-  [start, [53.6942, 88.0603]], // Междуреченск
-  [start, [52.5364, 85.2072]], // Бийск
-  [start, [53.7596, 87.1216]], // Новокузнецк
-  [start, [56.4977, 84.9744]], // Томск
-  [start, [55.3333, 86.0833]], // Кемерово
-  [start, [54.9924, 73.3686]], // Омск
-  [start, [53.344, 83.7783]] // Барнаул
+  { coords: [start, [53.6942, 88.0603]], name: 'Новосибирск → Междуреченск' },
+  { coords: [start, [52.5364, 85.2072]], name: 'Новосибирск → Бийск' },
+  { coords: [start, [53.7596, 87.1216]], name: 'Новосибирск → Новокузнецк' },
+  { coords: [start, [56.4977, 84.9744]], name: 'Новосибирск → Томск' },
+  { coords: [start, [55.3333, 86.0833]], name: 'Новосибирск → Кемерово' },
+  { coords: [start, [54.9924, 73.3686]], name: 'Новосибирск → Омск' },
+  { coords: [start, [53.344, 83.7783]], name: 'Новосибирск → Барнаул' }
 ];
 
 const OSRM_URL = 'http://127.0.0.1:5000/route/v1/driving/';
@@ -32,7 +32,7 @@ async function generateAll() {
         if (route.geometry && route.geometry.coordinates && route.geometry.coordinates.length > 0) {
           results.push({
             routeId: i,
-            name: `Новосибирск → Город ${i + 1}`,
+            name: routesData[i].name,
             fullGeometry: route.geometry.coordinates, // [[lon, lat], ...]
             legs: route.legs ? route.legs.map((leg, legIndex) => ({
               segment: legIndex,
