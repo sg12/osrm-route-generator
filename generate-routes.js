@@ -7,6 +7,18 @@ const terminals = {
   gusinobrodskiy: [55.041566, 83.026464] // Новосибирск, Гусинобродское шоссе
 };
 
+const yurtyRoutePoints = [
+  { order: 0,     lat: 55.035500, lon: 82.898431 }, // Новосибирский автовокзал-Главный
+  { order: 10,    lat: 55.041556, lon: 83.026420 }, // exit
+  { order: 20,    lat: 55.040342, lon: 83.024913 }, // turn
+  { order: 30,    lat: 55.039865, lon: 83.025057 }, // turn
+  { order: 40,    lat: 54.857821, lon: 84.812865 }, // entry — ⚠️ возможно опечатка? (см. ниже)
+  { order: 1000,  lat: 55.040269, lon: 83.399594 }, // Плотниково
+  { order: 2000,  lat: 54.988022, lon: 83.845790 }, // Усть-Каменка
+  { order: 999999, lat: 54.858003, lon: 84.811953 }  // Юрты
+].sort((a, b) => a.order - b.order)
+  .map(p => [p.lat, p.lon]);
+
 // ВСЕ МАРШРУТЫ ПО СФО
 const routesData = [
   // === НОВОСИБИРСКАЯ ОБЛАСТЬ ===
@@ -58,7 +70,21 @@ const routesData = [
   // === ОМСКАЯ ОБЛАСТЬ ===
   { coords: [terminals.central, [54.998618, 73.281255]], name: 'Новосибирск → Омск', terminal: 'central' },
   { coords: [terminals.central, [56.891642, 74.376966]], name: 'Новосибирск → Тара', terminal: 'central' },
-  { coords: [terminals.central, [55.044908, 74.576976]], name: 'Новосибирск → Калачинск', terminal: 'central' }
+  { coords: [terminals.central, [55.044908, 74.576976]], name: 'Новосибирск → Калачинск', terminal: 'central' },
+  {
+    waypoints: [
+      [55.041875, 83.030922], // Новосибирский автовокзал-Главный
+      [55.041556, 83.026420], // exit
+      [55.040342, 83.024913], // turn
+      [55.039865, 83.025057], // turn
+      [54.857821, 84.812865], // entry — ⚠️ проверьте корректность!
+      [55.040269, 83.399594], // Плотниково
+      [54.988022, 83.845790], // Усть-Каменка
+      [54.858003, 84.811953]  // Юрты
+    ],
+    name: 'Новосибирск → Юрты',
+    terminal: 'gusinobrodskiy'
+  }
 ];
 
 const OSRM_URL = 'http://127.0.0.1:5000/route/v1/driving/';
@@ -68,53 +94,66 @@ async function generateAll() {
   console.log(`🚀 Начинаем генерацию ${routesData.length} маршрутов...`);
 
   for (let i = 0; i < routesData.length; i++) {
-    const [[lat1, lon1], [lat2, lon2]] = routesData[i].coords;
-    const waypoints = `${lon1},${lat1};${lon2},${lat2}`;
-    const url = `${OSRM_URL}${waypoints}?overview=full&geometries=geojson&steps=true`;
+    const routeConfig = routesData[i];
+    
+    // Поддержка старого формата (coords) и нового (waypoints)
+    let points;
+    if (routeConfig.waypoints) {
+      points = routeConfig.waypoints; // [[lat, lon], [lat, lon], ...]
+    } else if (routeConfig.coords) {
+      points = routeConfig.coords; // для обратной совместимости
+    } else {
+      console.warn(`⚠️ Маршрут ${i + 1} не содержит coords или waypoints`);
+      continue;
+    }
+
+    // Проверка: минимум 2 точки
+    if (points.length < 2) {
+      console.warn(`⚠️ Маршрут ${i + 1} имеет менее 2 точек`);
+      continue;
+    }
+
+    // Формируем waypoints для OSRM: lon,lat;lon,lat;...
+    const waypointsStr = points.map(([lat, lon]) => `${lon},${lat}`).join(';');
+    const url = `${OSRM_URL}${waypointsStr}?overview=full&geometries=geojson&steps=true`;
 
     try {
       const { data } = await axios.get(url, { timeout: 10000 });
       
       if (data.code !== 'Ok') {
-        console.warn(`⚠️  Маршрут ${i + 1}/${routesData.length} (${routesData[i].name}) — OSRM error: ${data.code}`);
+        console.warn(`⚠️  Маршрут ${i + 1}/${routesData.length} (${routeConfig.name}) — OSRM error: ${data.code}`);
         continue;
       }
 
       const route = data.routes[0];
       
       if (!route?.geometry?.coordinates?.length) {
-        console.warn(`⚠️  Маршрут ${i + 1}/${routesData.length} (${routesData[i].name}) — пустая геометрия`);
+        console.warn(`⚠️  Маршрут ${i + 1}/${routesData.length} (${routeConfig.name}) — пустая геометрия`);
         continue;
       }
 
       results.push({
         routeId: i + 1,
-        name: routesData[i].name,
-        terminal: routesData[i].terminal,
+        name: routeConfig.name,
+        terminal: routeConfig.terminal,
         fullGeometry: route.geometry.coordinates,
         legs: route.legs?.map((leg, idx) => ({
           segment: idx + 1,
           distance: leg.distance,
-          duration: leg.duration
+          duration: leg.duration,
+          // Можно добавить from/to остановки, если нужно
         })) || [],
         totalDistance: route.distance,
         totalDuration: route.duration,
-        waypoints: {
-          start: data.waypoints[0],
-          end: data.waypoints[1]
-        }
+        waypoints: data.waypoints // все привязанные точки
       });
 
-      const startOffset = data.waypoints[0].distance || 0;
-      const endOffset = data.waypoints[1].distance || 0;
-      
-      console.log(`✅ Маршрут ${i + 1}/${routesData.length}: ${routesData[i].name} — ${(route.distance / 1000).toFixed(1)} км (смещение: ${startOffset.toFixed(0)}м/${endOffset.toFixed(0)}м)`);
+      console.log(`✅ Маршрут ${i + 1}/${routesData.length}: ${routeConfig.name} — ${(route.distance / 1000).toFixed(1)} км`);
 
     } catch (error) {
-      console.error(`❌ Ошибка маршрута ${i + 1} (${routesData[i].name}):`, error.message);
+      console.error(`❌ Ошибка маршрута ${i + 1} (${routeConfig.name}):`, error.message);
     }
 
-    // Пауза между запросами
     await new Promise(r => setTimeout(r, 150));
   }
 
