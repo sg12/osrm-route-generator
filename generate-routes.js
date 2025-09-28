@@ -1,3 +1,4 @@
+const express = require('express');
 const axios = require('axios');
 const fs = require('fs');
 
@@ -88,9 +89,66 @@ const routesData = [
 ];
 
 const OSRM_URL = 'http://127.0.0.1:5000/route/v1/driving/';
-const results = [];
+const app = express();
+app.use(express.json()); // Для парсинга JSON в POST
 
-async function generateAll() {
+// Эндпоинт: Динамическая генерация одного маршрута
+app.post('/generate-route', async (req, res) => {
+  try {
+    const { waypoints, name, saveToDisk = false } = req.body;
+
+    if (!waypoints || !Array.isArray(waypoints) || waypoints.length < 2) {
+      return res.status(400).json({ error: 'Нужны минимум 2 waypoints: [[lat1, lon1], [lat2, lon2]]' });
+    }
+
+    const waypointsStr = waypoints.map(([lat, lon]) => `${lon},${lat}`).join(';');
+    const url = `${OSRM_URL}${waypointsStr}?overview=full&geometries=geojson&steps=true`;
+
+    const { data } = await axios.get(url, { timeout: 10000 });
+
+    if (data.code !== 'Ok') {
+      return res.status(400).json({ error: `OSRM error: ${data.code}` });
+    }
+
+    const route = data.routes[0];
+    if (!route?.geometry?.coordinates?.length) {
+      return res.status(400).json({ error: 'Пустая геометрия' });
+    }
+
+    const result = {
+      name: name || 'Unnamed Route',
+      fullGeometry: route.geometry.coordinates,
+      legs: route.legs?.map((leg, idx) => ({
+        segment: idx + 1,
+        distance: leg.distance,
+        duration: leg.duration
+      })) || [],
+      totalDistance: route.distance,
+      totalDuration: route.duration,
+      waypoints: data.waypoints
+    };
+
+    // Опционально: Сохранить на диск
+    if (saveToDisk) {
+      const outputDir = '/output';
+      if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+      const filename = `${name || 'route'}.json`.replace(/[^a-z0-9]/gi, '_');
+      fs.writeFileSync(`${outputDir}/${filename}`, JSON.stringify(result, null, 2), 'utf8');
+    }
+
+    res.json(result); // Возвращаем в ответе
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Эндпоинт: Батч-генерация всех маршрутов (как оригинальный generateAll, но с возвратом JSON)
+app.post('/generate-all', async (req, res) => {
+  const { saveToDisk = true } = req.body;
+  const results = [];
+  let processed = 0;
+  let errors = 0;
+
   console.log(`🚀 Начинаем генерацию ${routesData.length} маршрутов...`);
 
   for (let i = 0; i < routesData.length; i++) {
@@ -104,12 +162,14 @@ async function generateAll() {
       points = routeConfig.coords; // для обратной совместимости
     } else {
       console.warn(`⚠️ Маршрут ${i + 1} не содержит coords или waypoints`);
+      errors++;
       continue;
     }
 
     // Проверка: минимум 2 точки
     if (points.length < 2) {
       console.warn(`⚠️ Маршрут ${i + 1} имеет менее 2 точек`);
+      errors++;
       continue;
     }
 
@@ -122,6 +182,7 @@ async function generateAll() {
       
       if (data.code !== 'Ok') {
         console.warn(`⚠️  Маршрут ${i + 1}/${routesData.length} (${routeConfig.name}) — OSRM error: ${data.code}`);
+        errors++;
         continue;
       }
 
@@ -129,6 +190,7 @@ async function generateAll() {
       
       if (!route?.geometry?.coordinates?.length) {
         console.warn(`⚠️  Маршрут ${i + 1}/${routesData.length} (${routeConfig.name}) — пустая геометрия`);
+        errors++;
         continue;
       }
 
@@ -149,41 +211,66 @@ async function generateAll() {
       });
 
       console.log(`✅ Маршрут ${i + 1}/${routesData.length}: ${routeConfig.name} — ${(route.distance / 1000).toFixed(1)} км`);
+      processed++;
 
     } catch (error) {
       console.error(`❌ Ошибка маршрута ${i + 1} (${routeConfig.name}):`, error.message);
+      errors++;
     }
 
+    // Пауза между запросами
     await new Promise(r => setTimeout(r, 150));
   }
 
-  // ВАЖНО: Используем /output вместо ./output для записи в примонтированную папку
-  const outputDir = '/output';
-  
-  // Проверяем существование папки
-  if (!fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir, { recursive: true });
+  // Опционально: Сохранить на диск
+  if (saveToDisk) {
+    const outputDir = '/output';
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    const outputPath = `${outputDir}/routes.json`;
+    fs.writeFileSync(outputPath, JSON.stringify(results, null, 2), 'utf8');
+    
+    console.log(`\n💾 Сохранено ${results.length} маршрутов в ${outputPath}`);
+    
+    // Сохраняем также сводку
+    const summary = results.map(r => ({
+      name: r.name,
+      distance_km: (r.totalDistance / 1000).toFixed(1),
+      duration_min: Math.round(r.totalDuration / 60),
+      terminal: r.terminal
+    }));
+    
+    fs.writeFileSync(`${outputDir}/routes_summary.json`, JSON.stringify(summary, null, 2));
+    console.log(`📋 Сводка сохранена в ${outputDir}/routes_summary.json`);
   }
 
-  const outputPath = `${outputDir}/routes.json`;
-  fs.writeFileSync(outputPath, JSON.stringify(results, null, 2), 'utf8');
-  
-  console.log(`\n💾 Сохранено ${results.length} маршрутов в ${outputPath}`);
-  console.log(`📊 Общая статистика:`);
-  console.log(`   - Успешно сгенерировано: ${results.length}`);
-  console.log(`   - Ошибок: ${routesData.length - results.length}`);
-  
-  // Сохраняем также сводку
+  // Возвращаем в ответе
   const summary = results.map(r => ({
     name: r.name,
     distance_km: (r.totalDistance / 1000).toFixed(1),
     duration_min: Math.round(r.totalDuration / 60),
     terminal: r.terminal
   }));
-  
-  fs.writeFileSync(`${outputDir}/routes_summary.json`, JSON.stringify(summary, null, 2));
-  console.log(`📋 Сводка сохранена в ${outputDir}/routes_summary.json`);
-}
 
-// Запуск генерации
-generateAll();
+  res.json({
+    results,
+    summary,
+    stats: {
+      processed,
+      errors,
+      total: routesData.length
+    }
+  });
+});
+
+// Health-check
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`🚀 API-сервер запущен на порту ${PORT}. OSRM доступен на 127.0.0.1:5000.`);
+});
