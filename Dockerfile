@@ -8,11 +8,11 @@ RUN apk update && apk add --no-cache nodejs npm wget curl
 WORKDIR /data
 RUN wget -O siberian-fed-district-latest.osm.pbf https://download.geofabrik.de/russia/siberian-fed-district-latest.osm.pbf
 
-# Скопируйте профиль car.lua
-COPY car.lua /opt/car.lua
+# Скопируйте профиль bus.lua
+COPY bus.lua /opt/bus.lua
 
 # Preprocessing
-RUN osrm-extract -p /opt/car.lua siberian-fed-district-latest.osm.pbf && \
+RUN osrm-extract -p /opt/bus.lua siberian-fed-district-latest.osm.pbf && \
     osrm-partition siberian-fed-district-latest.osrm && \
     osrm-customize siberian-fed-district-latest.osrm
 
