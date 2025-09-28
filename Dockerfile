@@ -35,15 +35,15 @@ COPY --from=builder /usr/lib/libbz2* /usr/lib/
 COPY --from=builder /usr/lib/liblzma* /usr/lib/
 COPY --from=builder /usr/lib/libzstd* /usr/lib/
 
-# Скрипт API
-COPY app.js /app/app.js  # Переименуйте generate-routes.js в app.js
+# Скрипт API (используем generate-routes.js без переименования)
+COPY generate-routes.js /app/generate-routes.js
 WORKDIR /app
 
-# Установите зависимости (axios + express)
+# Установите зависимости (axios + express для API)
 RUN npm init -y && npm install axios express
 
 # PATH
 ENV PATH="/usr/bin:$PATH"
 
 # Запуск: OSRM в фоне + Node.js API на 3000
-CMD ["sh", "-c", "/usr/bin/osrm-routed --algorithm MLD /data/siberian-fed-district-latest.osrm & sleep 10 && node app.js && wait"]
+CMD ["sh", "-c", "/usr/bin/osrm-routed --algorithm MLD /data/siberian-fed-district-latest.osrm & sleep 10 && node generate-routes.js && wait"]
