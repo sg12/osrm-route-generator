@@ -35,7 +35,7 @@ COPY --from=builder /usr/lib/libbz2* /usr/lib/
 COPY --from=builder /usr/lib/liblzma* /usr/lib/
 COPY --from=builder /usr/lib/libzstd* /usr/lib/
 
-# Скрипт API (используем generate-routes.js без переименования)
+# Скрипт API
 COPY generate-routes.js /app/generate-routes.js
 WORKDIR /app
 
@@ -46,4 +46,4 @@ RUN npm init -y && npm install axios express
 ENV PATH="/usr/bin:$PATH"
 
 # Запуск: OSRM в фоне + Node.js API на 3000
-CMD ["sh", "-c", "/usr/bin/osrm-routed --algorithm MLD /data/siberian-fed-district-latest.osrm & sleep 10 && node generate-routes.js && wait"]
+CMD ["sh", "-c", "/usr/bin/osrm-routed --algorithm MLD /data/siberian-fed-district-latest.osrm & sleep 10 && node generate-routes.js"]
