@@ -1,5 +1,5 @@
 -- Bus profile for OSRM, adapted for Siberian routes
--- Fixed: Integrated busway logic into WayHandlers.speed to avoid direct result modification
+-- Fixed: Custom busway handler with proper signature and safe result assignment
 
 api_version = 4
 
@@ -143,6 +143,32 @@ function setup()
   }
 end
 
+-- Custom handler for busway boost (after standard speed)
+local function busway_speed_handler(way, profile, result)
+  local busway = way:get_value_by_key("busway")
+  if busway and busway ~= "no" then
+    local length = way:get_length()  -- meters
+    local boost_speed = 60  -- km/h boost for bus lanes
+    local new_duration = (length / boost_speed) * 3.6  -- seconds (length m / kmh * 3600/1000)
+
+    -- Override duration
+    result.duration = new_duration
+
+    -- Set speeds, respecting oneway (safe assignment)
+    local oneway = way:get_value_by_key("oneway")
+    if oneway == "yes" or oneway == "1" then
+      result.forward_speed = boost_speed
+      result.backward_speed = 0
+    elseif oneway == "-1" then
+      result.forward_speed = 0
+      result.backward_speed = boost_speed
+    else
+      result.forward_speed = boost_speed
+      result.backward_speed = boost_speed
+    end
+  end
+end
+
 function process_node(profile, node, result, relations)
   local access = find_access_tag(node, profile.access_tags_hierarchy)
   if access then
@@ -187,15 +213,14 @@ function process_way(profile, way, result, relations)
   local data = {
     highway = way:get_value_by_key('highway'),
     bridge = way:get_value_by_key('bridge'),
-    route = way:get_value_by_key('route'),
-    busway = way:get_value_by_key('busway')  -- Prefetch busway
+    route = way:get_value_by_key('route')
   }
 
   if (not data.highway or data.highway == '') and (not data.route or data.route == '') then
     return
   end
 
-  -- Standard handlers sequence
+  -- Standard handlers + custom busway after speed
   local handlers = Sequence {
     WayHandlers.default_mode,
     WayHandlers.blocked_ways,
@@ -211,22 +236,8 @@ function process_way(profile, way, result, relations)
     WayHandlers.movables,
     WayHandlers.service,
     WayHandlers.hov,
-
-    -- Custom busway integration: override speed after WayHandlers.speed
-    WayHandlers.speed,
-    function(way, result)
-      -- Apply busway boost AFTER speed calculation
-      if data.busway and data.busway ~= 'no' then
-        local bus_speed = 60  -- Boost on bus lanes
-        -- Set speeds via forward/backward (OSRM-safe way)
-        local current_speed = result.forward_speed or result.backward_speed or 50
-        local boosted_speed = math.max(current_speed, bus_speed)
-        result.forward_speed = boosted_speed
-        result.backward_speed = boosted_speed
-        result.mode = mode.driving  -- Ensure mode
-      end
-    end,
-
+    WayHandlers.speed,  -- Standard speed first
+    busway_speed_handler,  -- Custom boost after
     WayHandlers.maxspeed,
     WayHandlers.surface,
     WayHandlers.penalties,
